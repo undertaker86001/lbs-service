@@ -1,0 +1,78 @@
+# 精准LBS社交匹配系统 Docker Compose配置
+
+version: '3.8'
+
+services:
+  # 主应用服务
+  lbs-service:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - REDIS_HOST=redis
+      - MYSQL_HOST=mysql
+      - REDIS_PORT=6379
+      - MYSQL_PORT=3306
+      - MYSQL_USER=lbs_user
+      - MYSQL_PASSWORD=lbs_password
+      - MYSQL_DATABASE=lbs_social
+    depends_on:
+      - redis
+      - mysql
+    volumes:
+      - ./logs:/app/logs
+    restart: unless-stopped
+    networks:
+      - lbs-network
+
+  # Redis服务
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    restart: unless-stopped
+    networks:
+      - lbs-network
+
+  # MySQL服务
+  mysql:
+    image: mysql:8.0
+    ports:
+      - "3306:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=root_password
+      - MYSQL_DATABASE=lbs_social
+      - MYSQL_USER=lbs_user
+      - MYSQL_PASSWORD=lbs_password
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    restart: unless-stopped
+    networks:
+      - lbs-network
+
+  # Nginx反向代理（可选）
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - ./ssl:/etc/nginx/ssl
+    depends_on:
+      - lbs-service
+    restart: unless-stopped
+    networks:
+      - lbs-network
+
+volumes:
+  redis_data:
+  mysql_data:
+
+networks:
+  lbs-network:
+    driver: bridge
